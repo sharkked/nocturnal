@@ -1060,6 +1060,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "nocturnal"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dotenv",
+ "mongodb",
+ "rand",
+ "rocket",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1877,20 +1891,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb71511c991639bb078fd5bf97757e03914361c48100d52878b8e52b46fb92cd"
 dependencies = [
  "time-core",
-]
-
-[[package]]
-name = "tinychat"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenv",
- "mongodb",
- "rand",
- "rocket",
- "serde",
- "thiserror",
- "tokio",
 ]
 
 [[package]]

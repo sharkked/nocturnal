@@ -1,10 +1,10 @@
-use crate::schema::{User, Message};
+use crate::schema::{Message, User};
 use dotenv::dotenv;
 use mongodb::{
     bson::{doc, oid::ObjectId},
     options::{ClientOptions, ServerApi, ServerApiVersion},
-    results::InsertOneResult,
-    Client, Collection, Database,
+    results::{DeleteResult, InsertOneResult},
+    Client, Collection,
 };
 use std::env;
 use thiserror::Error;
@@ -18,7 +18,7 @@ type Result<T> = core::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Error, Debug)]
 #[error(transparent)]
-pub struct MongoError (#[from] mongodb::error::Error);
+pub struct MongoError(#[from] mongodb::error::Error);
 
 impl DBConnection {
     pub async fn init() -> Result<Self> {
@@ -31,7 +31,7 @@ impl DBConnection {
         client_options.server_api = Some(server_api);
 
         let client = Client::with_options(client_options)?;
-        let db = client.database("tinychat");
+        let db = client.database("nocturnal");
 
         let users: Collection<User> = db.collection("users");
         let messages: Collection<Message> = db.collection("messages");
@@ -40,7 +40,11 @@ impl DBConnection {
     }
 
     pub async fn ping(&self) -> Result<()> {
-        self.users.client().database("tinychat").run_command(doc! {"ping":1}, None).await?;
+        self.users
+            .client()
+            .database("nocturnal")
+            .run_command(doc! {"ping":1}, None)
+            .await?;
         Ok(())
     }
 
@@ -50,7 +54,10 @@ impl DBConnection {
     }
 
     pub async fn find_user_by_username(&self, username: &str) -> Result<Option<User>> {
-        let user = self.users.find_one(doc! {"username": username}, None).await?;
+        let user = self
+            .users
+            .find_one(doc! {"username": username}, None)
+            .await?;
         Ok(user)
     }
 
@@ -62,6 +69,10 @@ impl DBConnection {
             created_at: None,
         };
         Ok(self.users.insert_one(new_doc, None).await?)
+    }
+
+    pub async fn delete_user(&self, id: ObjectId) -> Result<DeleteResult> {
+        Ok(self.users.delete_one(doc! { "_id": id }, None).await?)
     }
 
     pub async fn create_message(&self, content: &str, author: ObjectId) -> Result<InsertOneResult> {
@@ -84,10 +95,10 @@ mod tests {
 
     async fn init_db() -> DBConnection {
         let mut db_connection = DBConnection::init().await.expect("Database should connect");
-        let db = db_connection.users.client().database("tinychat");
+        let db = db_connection.users.client().database("nocturnal");
         db_connection.users = db.collection("users-test");
         db_connection.messages = db.collection("messages-test");
-        return db_connection
+        return db_connection;
     }
 
     #[tokio::test]
@@ -97,21 +108,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn can_create_user() {
+    async fn basic_user_operations() {
         let db = DB.get_or_init(init_db).await;
+        let username = "evvil";
         let new_user = User {
             id: None,
-            username: String::from("evvil"),
-            displayname: String::from("fakeuser"),
+            username: String::from(username),
+            displayname: String::from(username),
             created_at: None,
         };
-        db.create_user(new_user).await.expect("should be able to insert an item.");
-    }
-
-    #[tokio::test]
-    async fn can_find_user() {
-        let db = DB.get_or_init(init_db).await;
-        let user = db.find_user_by_username("evvil").await.expect("should be able to find by username").expect("user with this username should exist");
-        db.find_user(user.id.unwrap()).await.expect("should be able to find by id").expect("user with this id should exist");
+        db.create_user(new_user).await.expect("create should be ok");
+        let user = db
+            .find_user_by_username(username)
+            .await
+            .expect("find by username should be ok")
+            .expect("user with this username should exist");
+        let id = user.id.unwrap();
+        db.find_user(id)
+            .await
+            .expect("find by id should be ok")
+            .expect("user with this id should exist");
+        db.delete_user(id).await.expect("delete should be ok");
     }
 }
